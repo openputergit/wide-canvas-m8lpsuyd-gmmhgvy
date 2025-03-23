@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Canteen System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<style>
+    body { font-family: 'Poppins', sans-serif; }
+    .menu-item:hover { transform: translateY(-5px); }
+    .notification { animation: slideIn 0.5s ease-out; }
+    @keyframes slideIn {
+        from { transform: translateY(-100%); }
+        to { transform: translateY(0); }
+    }
+    .qr-code {
+        transition: all 0.3s ease;
+    }
+</style>
+<body class="bg-gray-50">
+    <div id="app" class="min-h-screen">
+        <!-- Navigation -->
+        <nav class="bg-teal-600 text-white p-4 shadow-lg">
+            <div class="container mx-auto flex justify-between items-center">
+                <h1 class="text-2xl font-bold">Digital Canteen</h1>
+                <div class="flex gap-4" v-if="!isLoggedIn">
+                    <button @click="showLoginModal = true" class="px-4 py-2 bg-white text-teal-600 rounded-lg hover:bg-gray-100">Login</button>
+                    <button @click="showSignupModal = true" class="px-4 py-2 border border-white rounded-lg hover:bg-teal-700">Sign Up</button>
+                </div>
+                <div v-else class="flex items-center gap-4">
+                    <span>Welcome, {{user.name}}</span>
+                    <button @click="logout" class="px-4 py-2 border border-white rounded-lg hover:bg-teal-700">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="container mx-auto p-4">
+            <!-- Menu Categories -->
+            <div class="flex justify-center gap-4 mb-8">
+                <button v-for="category in categories" 
+                        :key="category"
+                        @click="selectedCategory = category"
+                        :class="['px-6 py-2 rounded-full', selectedCategory === category ? 'bg-teal-600 text-white' : 'bg-gray-200']">
+                    {{category}}
+                </button>
+            </div>
+
+            <!-- Menu Items -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div v-for="item in filteredMenu" :key="item.id" 
+                     class="menu-item bg-white p-4 rounded-lg shadow-md transition-all duration-300">
+                    <img :src="item.image" :alt="item.name" class="w-full h-48 object-cover rounded-lg mb-4">
+                    <h3 class="text-xl font-semibold">{{item.name}}</h3>
+                    <p class="text-gray-600">{{item.description}}</p>
+                    <div class="flex justify-between items-center mt-4">
+                        <span class="text-teal-600 font-bold">₹{{item.price}}</span>
+                        <button @click="addToCart(item)" 
+                                class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">
+                            Add to Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cart Modal -->
+            <div v-if="showCart" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                <div class="bg-white p-6 rounded-lg w-full max-w-md">
+                    <h2 class="text-2xl font-bold mb-4">Your Cart</h2>
+                    <div class="max-h-96 overflow-y-auto">
+                        <div v-for="item in cart" :key="item.id" class="flex justify-between items-center mb-4">
+                            <div>
+                                <h3 class="font-semibold">{{item.name}}</h3>
+                                <p class="text-gray-600">₹{{item.price}} x {{item.quantity}}</p>
+                            </div>
+                            <div class="flex gap-2 items-center">
+                                <button @click="updateQuantity(item, -1)" class="px-2 py-1 bg-gray-200 rounded">-</button>
+                                <span>{{item.quantity}}</span>
+                                <button @click="updateQuantity(item, 1)" class="px-2 py-1 bg-gray-200 rounded">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 border-t pt-4">
+                        <div class="flex justify-between mb-4">
+                            <span class="font-bold">Total:</span>
+                            <span class="font-bold">₹{{cartTotal}}</span>
+                        </div>
+                        <div class="flex gap-4">
+                            <button @click="placeOrder" class="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">
+                                Place Order
+                            </button>
+                            <button @click="showCart = false" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Login Modal -->
+            <div v-if="showLoginModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                <div class="bg-white p-6 rounded-lg w-full max-w-md">
+                    <h2 class="text-2xl font-bold mb-4">Login</h2>
+                    <input v-model="loginForm.studentId" type="text" placeholder="Student ID" 
+                           class="w-full mb-4 p-2 border rounded">
+                    <input v-model="loginForm.password" type="password" placeholder="Password" 
+                           class="w-full mb-4 p-2 border rounded">
+                    <button @click="login" class="w-full px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">
+                        Login
+                    </button>
+                    <button @click="showLoginModal = false" class="w-full mt-2 px-4 py-2 border rounded-lg hover:bg-gray-100">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Notifications -->
+        <div class="fixed top-4 right-4 z-50">
+            <div v-for="notification in notifications" :key="notification.id" 
+                 class="notification bg-teal-600 text-white p-4 rounded-lg mb-2 shadow-lg">
+                {{notification.message}}
+            </div>
+        </div>
+    </div>
+
+<script>
+const { createApp } = Vue
+
+createApp({
+    data() {
+        return {
+            isLoggedIn: false,
+            user: null,
+            showLoginModal: false,
+            showSignupModal: false,
+            showCart: false,
+            loginForm: {
+                studentId: '',
+                password: ''
+            },
+            categories: ['Breakfast', 'Lunch', 'Snacks'],
+            selectedCategory: 'Breakfast',
+            menu: [
+                {
+                    id: 1,
+                    name: 'Masala Dosa',
+                    description: 'Crispy dosa with spicy potato filling',
+                    price: 60,
+                    category: 'Breakfast',
+                    image: 'https://source.unsplash.com/400x300/?dosa'
+                },
+                {
+                    id: 2,
+                    name: 'Thali',
+                    description: 'Complete meal with dal, rice, roti and more',
+                    price: 120,
+                    category: 'Lunch',
+                    image: 'https://source.unsplash.com/400x300/?indianfood'
+                },
+                {
+                    id: 3,
+                    name: 'Samosa',
+                    description: 'Crispy pastry with spiced potato filling',
+                    price: 20,
+                    category: 'Snacks',
+                    image: 'https://source.unsplash.com/400x300/?samosa'
+                }
+                // Add more menu items here
+            ],
+            cart: [],
+            notifications: []
+        }
+    },
+    computed: {
+        filteredMenu() {
+            return this.menu.filter(item => item.category === this.selectedCategory)
+        },
+        cartTotal() {
+            return this.cart.reduce((total, item) => total + (item.price * item.quantity), 0)
+        }
+    },
+    methods: {
+        login() {
+            // Simulated login
+            this.isLoggedIn = true
+            this.user = {
+                name: 'Student',
+                id: this.loginForm.studentId
+            }
+            this.showLoginModal = false
+            this.showNotification('Successfully logged in!')
+        },
+        logout() {
+            this.isLoggedIn = false
+            this.user = null
+            this.showNotification('Logged out successfully')
+        },
+        addToCart(item) {
+            if (!this.isLoggedIn) {
+                this.showNotification('Please login to add items to cart')
+                this.showLoginModal = true
+                return
+            }
+            
+            const existingItem = this.cart.find(cartItem => cartItem.id === item.id)
+            if (existingItem) {
+                existingItem.quantity++
+            } else {
+                this.cart.push({...item, quantity: 1})
+            }
+            this.showCart = true
+        },
+        updateQuantity(item, change) {
+            const cartItem = this.cart.find(i => i.id === item.id)
+            cartItem.quantity += change
+            if (cartItem.quantity <= 0) {
+                this.cart = this.cart.filter(i => i.id !== item.id)
+            }
+        },
+        placeOrder() {
+            if (this.cart.length === 0) return
+            
+            const orderId = Math.random().toString(36).substr(2, 9)
+            this.showNotification(`Order placed successfully! Order ID: ${orderId}`)
+            setTimeout(() => {
+                this.showNotification(`Your order #${orderId} is ready for pickup!`)
+            }, 5000)
+            
+            this.cart = []
+            this.showCart = false
+        },
+        showNotification(message) {
+            const id = Date.now()
+            this.notifications.push({ id, message })
+            setTimeout(() => {
+                this.notifications = this.notifications.filter(n => n.id !== id)
+            }, 3000)
+        }
+    }
+}).mount('#app')
+</script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
